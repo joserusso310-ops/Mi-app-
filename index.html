@@ -3,72 +3,129 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Editor de Isogramas de Plomería</title>
+  <title>Diseñador de Isogramas de Plomería</title>
   <style>
     * { box-sizing: border-box; touch-action: none; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    body { background: #141419; color: #e1e1e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    body { background: #121214; color: #e1e1e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
     
-    /* Barra Superior */
-    #toolbar { display: flex; gap: 6px; padding: 8px; background: #1e1e24; border-bottom: 1px solid #323238; overflow-x: auto; align-items: center; z-index: 10; }
-    button { background: #29292e; color: #e1e1e6; border: 1px solid #323238; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
-    button:active { background: #323238; }
-    button.active { background: #2d82b7; border-color: #00b37e; color: #fff; font-weight: bold; }
+    /* Toolbar Principal */
+    #toolbar { display: flex; gap: 6px; padding: 8px; background: #1e1e24; border-bottom: 1px solid #323238; overflow-x: auto; align-items: center; z-index: 10; scrollbar-width: none; }
+    #toolbar::-webkit-scrollbar { display: none; }
     
+    button, select { background: #29292e; color: #e1e1e6; border: 1px solid #323238; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; display: flex; align-items: center; gap: 5px; outline: none; }
+    button:active, select:active { background: #323238; }
+    button.active { background: #00875f; border-color: #00b37e; color: #fff; }
+    select { padding-right: 20px; }
+
     /* Contenedor del Lienzo */
-    #canvas-container { flex: 1; position: relative; width: 100%; height: 100%; background: #09090a; cursor: crosshair; }
+    #canvas-container { flex: 1; position: relative; width: 100%; height: 100%; background: #09090a; }
     canvas { width: 100%; height: 100%; display: block; }
-    
-    /* Menú Modal */
-    #menu-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
-    .modal-content { background: #1e1e24; border: 1px solid #323238; border-radius: 12px; padding: 20px; width: 85%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* Menús Modales */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; justify-content: center; align-items: center; }
+    .modal-content { background: #1e1e24; border: 1px solid #323238; border-radius: 12px; padding: 20px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 12px; max-height: 85vh; overflow-y: auto; }
     .modal-content h3 { color: #fff; text-align: center; font-size: 18px; margin-bottom: 5px; }
-    .modal-btn { padding: 12px; border-radius: 8px; background: #29292e; border: 1px solid #323238; color: #fff; text-align: center; font-size: 14px; font-weight: 600; }
+    .modal-btn { padding: 12px; border-radius: 8px; background: #29292e; border: 1px solid #323238; color: #fff; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer; }
     .modal-btn.primary { background: #00875f; border-color: #00b37e; }
     .modal-btn.danger { background: #aa2424; border-color: #f75a68; }
+
+    /* Tabla de Materiales */
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    th, td { border: 1px solid #323238; padding: 8px; text-align: left; }
+    th { background: #29292e; color: #00b37e; }
   </style>
 </head>
 <body>
 
+  <!-- Barra de Herramientas Principal -->
   <div id="toolbar">
-    <button id="btn-menu" onclick="toggleMenu()">📋 Menú</button>
+    <button onclick="openModal('menu-modal')">📋 Menú</button>
     <button id="btn-move" class="active" onclick="setMode('move')">✋ Mover</button>
     <button id="btn-node" onclick="setMode('node')">📍 Nodo</button>
     <button id="btn-pipe" onclick="setMode('pipe')">🔗 Tubo</button>
+    
+    <!-- Selección de Tipo de Sistema -->
+    <select id="sys-type" onchange="draw()">
+      <option value="af">🔵 Agua Fría</option>
+      <option value="ac">🔴 Agua Caliente</option>
+      <option value="as">🟠 Drenaje / Servidas</option>
+      <option value="gas">🟡 Ventilación / Gas</option>
+    </select>
+
+    <!-- Diámetro -->
+    <select id="pipe-dia">
+      <option value="1/2">½"</option>
+      <option value="3/4">¾"</option>
+      <option value="1">1"</option>
+      <option value="1.5">1 ½"</option>
+      <option value="2">2"</option>
+      <option value="4">4"</option>
+    </select>
+
+    <!-- Accesorios -->
+    <select id="fitting-type">
+      <option value="none">📍 Nodo Simple</option>
+      <option value="codo">↩️ Codo 90°</option>
+      <option value="tee">🔀 Tee</option>
+      <option value="valvula">🚰 Válvula de Paso</option>
+      <option value="bomba">⚙️ Bomba de Agua</option>
+      <option value="punto">🚿 Punto de Agua</option>
+    </select>
+
     <button id="btn-level" onclick="toggleLevel()">🏢 Planta Baja</button>
+    <button onclick="undo()">↩️ Deshacer</button>
   </div>
 
   <div id="canvas-container">
     <canvas id="isoCanvas"></canvas>
   </div>
 
-  <!-- Modal Menú -->
-  <div id="menu-modal" onclick="toggleMenu()">
+  <!-- Modal Menú Principal -->
+  <div id="menu-modal" class="modal" onclick="closeModal('menu-modal')">
     <div class="modal-content" onclick="event.stopPropagation()">
       <h3>Opciones del Proyecto</h3>
-      <button class="modal-btn primary" onclick="exportImage()">📸 Exportar Imagen (PNG)</button>
-      <button class="modal-btn" onclick="saveData()">💾 Guardar en Teléfono</button>
+      <button class="modal-btn primary" onclick="generateMaterials()">📊 Cómputo de Materiales</button>
+      <button class="modal-btn" onclick="exportImage()">📸 Exportar Imagen (PNG)</button>
+      <button class="modal-btn" onclick="saveData()">💾 Guardar Proyecto</button>
       <button class="modal-btn danger" onclick="clearAll()">🗑️ Borrar Todo</button>
-      <button class="modal-btn" onclick="toggleMenu()">❌ Cerrar</button>
+      <button class="modal-btn" onclick="closeModal('menu-modal')">❌ Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Modal Cómputo de Materiales -->
+  <div id="materials-modal" class="modal" onclick="closeModal('materials-modal')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <h3>Lista de Materiales</h3>
+      <div id="materials-list"></div>
+      <button class="modal-btn" onclick="closeModal('materials-modal')">Cerrar</button>
     </div>
   </div>
 
   <script>
     const canvas = document.getElementById('isoCanvas');
     const ctx = canvas.getContext('2d');
-    
-    // Estado de la app
-    let mode = 'move'; // move, node, pipe
+
+    // Configuración del Sistema
+    let mode = 'move';
     let currentLevel = 'Planta Baja';
     let panX = 0, panY = 0;
     let isDragging = false;
     let startX = 0, startY = 0;
-    
+
     let nodes = [];
     let pipes = [];
+    let history = [];
     let selectedNode = null;
-    
+
     const isoAngle = Math.PI / 6; // 30 grados
-    const gridSize = 40;
+    const gridSize = 35;
+
+    const sysColors = {
+      af: '#00a8ff',
+      ac: '#ff4757',
+      as: '#ffa502',
+      gas: '#eccc68'
+    };
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
@@ -77,44 +134,28 @@
     }
     window.addEventListener('resize', resizeCanvas);
 
-    // Guardado y Carga
-    function saveData() {
-      localStorage.setItem('iso_plumbing_nodes', JSON.stringify(nodes));
-      localStorage.setItem('iso_plumbing_pipes', JSON.stringify(pipes));
-      alert('¡Proyecto guardado con éxito!');
-      toggleMenu();
+    function saveState() {
+      history.push(JSON.stringify({ nodes, pipes }));
+      if (history.length > 20) history.shift();
     }
 
-    function loadData() {
-      const savedNodes = localStorage.getItem('iso_plumbing_nodes');
-      const savedPipes = localStorage.getItem('iso_plumbing_pipes');
-      if(savedNodes) nodes = JSON.parse(savedNodes);
-      if(savedPipes) pipes = JSON.parse(savedPipes);
-    }
-
-    function clearAll() {
-      if(confirm('¿Seguro que deseas borrar todo el dibujo?')) {
-        nodes = [];
-        pipes = [];
+    function undo() {
+      if (history.length > 0) {
+        const last = JSON.parse(history.pop());
+        nodes = last.nodes;
+        pipes = last.pipes;
         selectedNode = null;
-        localStorage.removeItem('iso_plumbing_nodes');
-        localStorage.removeItem('iso_plumbing_pipes');
         draw();
-        toggleMenu();
       }
     }
 
-    function toggleMenu() {
-      const modal = document.getElementById('menu-modal');
-      modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
-    }
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     function setMode(newMode) {
       mode = newMode;
       document.querySelectorAll('#toolbar button').forEach(b => {
-        if(b.id.startsWith('btn-') && b.id !== 'btn-menu' && b.id !== 'btn-level') {
-          b.classList.remove('active');
-        }
+        if (['btn-move', 'btn-node', 'btn-pipe'].includes(b.id)) b.classList.remove('active');
       });
       document.getElementById('btn-' + newMode).classList.add('active');
       selectedNode = null;
@@ -127,27 +168,24 @@
       draw();
     }
 
-    // Conversión de coordenadas a Isométrico con Ajuste (Snap)
+    // Conversión e Intersección Isométrica
     function getIsoGridPoint(screenX, screenY) {
       const relX = screenX - (canvas.width / 2) - panX;
       const relY = screenY - (canvas.height / 3) - panY;
 
-      // Inversa isométrica
       const isoX = (relX / Math.cos(isoAngle) + relY / Math.sin(isoAngle)) / 2;
       const isoY = (relY / Math.sin(isoAngle) - relX / Math.cos(isoAngle)) / 2;
 
-      // Snap a la cuadrícula
-      const snappedIsoX = Math.round(isoX / gridSize) * gridSize;
-      const snappedIsoY = Math.round(isoY / gridSize) * gridSize;
+      const snappedX = Math.round(isoX / gridSize) * gridSize;
+      const snappedY = Math.round(isoY / gridSize) * gridSize;
 
-      // Proyectar de vuelta a pantalla
-      const finalX = (canvas.width / 2) + panX + (snappedIsoX - snappedIsoY) * Math.cos(isoAngle);
-      const finalY = (canvas.height / 3) + panY + (snappedIsoX + snappedIsoY) * Math.sin(isoAngle);
+      const finalX = (canvas.width / 2) + panX + (snappedX - snappedY) * Math.cos(isoAngle);
+      const finalY = (canvas.height / 3) + panY + (snappedX + snappedY) * Math.sin(isoAngle);
 
-      return { x: finalX, y: finalY, level: currentLevel };
+      return { x: finalX, y: finalY };
     }
 
-    // Eventos Táctiles y Ratón (PointerEvents)
+    // Eventos Táctiles y de Ratón
     canvas.addEventListener('pointerdown', (e) => {
       startX = e.clientX;
       startY = e.clientY;
@@ -155,18 +193,23 @@
       if (mode === 'move') {
         isDragging = true;
       } else if (mode === 'node') {
-        const point = getIsoGridPoint(e.clientX, e.clientY);
-        nodes.push({ id: Date.now(), x: point.x - panX, y: point.y - panY, level: currentLevel });
+        saveState();
+        const pt = getIsoGridPoint(e.clientX, e.clientY);
+        const fit = document.getElementById('fitting-type').value;
+        nodes.push({ id: Date.now(), x: pt.x - panX, y: pt.y - panY, level: currentLevel, fitting: fit });
         draw();
       } else if (mode === 'pipe') {
-        const point = { x: e.clientX - panX, y: e.clientY - panY };
-        const clicked = nodes.find(n => Math.hypot(n.x - point.x, n.y - point.y) < 25 && n.level === currentLevel);
-        
+        const pt = { x: e.clientX - panX, y: e.clientY - panY };
+        const clicked = nodes.find(n => Math.hypot(n.x - pt.x, n.y - pt.y) < 22 && n.level === currentLevel);
+
         if (clicked) {
           if (!selectedNode) {
             selectedNode = clicked;
           } else if (selectedNode.id !== clicked.id) {
-            pipes.push({ id: Date.now(), from: selectedNode.id, to: clicked.id, level: currentLevel });
+            saveState();
+            const sys = document.getElementById('sys-type').value;
+            const dia = document.getElementById('pipe-dia').value;
+            pipes.push({ id: Date.now(), from: selectedNode.id, to: clicked.id, system: sys, diameter: dia, level: currentLevel });
             selectedNode = null;
           }
           draw();
@@ -184,25 +227,22 @@
       }
     });
 
-    canvas.addEventListener('pointerup', () => { isDragging = false; });
-    canvas.addEventListener('pointercancel', () => { isDragging = false; });
+    canvas.addEventListener('pointerup', () => isDragging = false);
 
-    // Renderizado del Isograma
+    // Dibujado Principal
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Dibujar Rejilla Isométrica
-      ctx.strokeStyle = '#23232a';
-      ctx.lineWidth = 1;
+      // Rejilla Isométrica
       const centerX = canvas.width / 2 + panX;
       const centerY = canvas.height / 3 + panY;
 
-      for (let r = -15; r <= 15; r++) {
-        for (let c = -15; c <= 15; c++) {
+      for (let r = -12; r <= 12; r++) {
+        for (let c = -12; c <= 12; c++) {
           const gx = centerX + (r - c) * gridSize * Math.cos(isoAngle);
           const gy = centerY + (r + c) * gridSize * Math.sin(isoAngle);
           ctx.beginPath();
-          ctx.arc(gx, gy, 1.5, 0, Math.PI * 2);
+          ctx.arc(gx, gy, 1.2, 0, Math.PI * 2);
           ctx.fillStyle = '#323238';
           ctx.fill();
         }
@@ -216,30 +256,102 @@
           ctx.beginPath();
           ctx.moveTo(n1.x + panX, n1.y + panY);
           ctx.lineTo(n2.x + panX, n2.y + panY);
-          ctx.strokeStyle = p.level === 'Planta Baja' ? '#00b37e' : '#2d82b7';
-          ctx.lineWidth = 5;
+          ctx.strokeStyle = sysColors[p.system] || '#00a8ff';
+          ctx.lineWidth = Math.max(3, parseFloat(p.diameter) * 3);
           ctx.lineCap = 'round';
+          if (p.level !== currentLevel) ctx.globalAlpha = 0.3;
           ctx.stroke();
+          ctx.globalAlpha = 1.0;
         }
       });
 
-      // Dibujar Nodos / Accesorios
+      // Dibujar Nodos y Accesorios
       nodes.forEach(n => {
-        const isCurrentLevel = n.level === currentLevel;
+        const isCurrent = n.level === currentLevel;
+        const nx = n.x + panX;
+        const ny = n.y + panY;
+
         ctx.beginPath();
-        ctx.arc(n.x + panX, n.y + panY, 7, 0, Math.PI * 2);
-        
-        if (selectedNode && selectedNode.id === n.id) {
-          ctx.fillStyle = '#fba94c'; // Nodo seleccionado
-        } else {
-          ctx.fillStyle = isCurrentLevel ? (n.level === 'Planta Baja' ? '#00b37e' : '#2d82b7') : '#44444e';
-        }
-        
+        ctx.arc(nx, ny, 7, 0, Math.PI * 2);
+        ctx.fillStyle = selectedNode && selectedNode.id === n.id ? '#fba94c' : (isCurrent ? '#00b37e' : '#555');
         ctx.fill();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+
+        // Iconos de Accesorios
+        if (n.fitting && n.fitting !== 'none') {
+          ctx.fillStyle = '#fff';
+          ctx.font = '10px sans-serif';
+          let label = '';
+          if (n.fitting === 'valvula') label = '🚰';
+          if (n.fitting === 'codo') label = '90°';
+          if (n.fitting === 'tee') label = 'T';
+          if (n.fitting === 'bomba') label = '⚙️';
+          if (n.fitting === 'punto') label = '🚿';
+          ctx.fillText(label, nx + 9, ny - 5);
+        }
       });
+    }
+
+    // Cómputo Automático de Materiales
+    function generateMaterials() {
+      let pipeSummary = {};
+      let fittingSummary = {};
+
+      pipes.forEach(p => {
+        const n1 = nodes.find(n => n.id === p.from);
+        const n2 = nodes.find(n => n.id === p.to);
+        if (n1 && n2) {
+          const distPixels = Math.hypot(n2.x - n1.x, n2.y - n1.y);
+          const meters = (distPixels / gridSize) * 0.5; // Escala: 1 cuadrícula = 0.5m
+          const key = `Tubería ${p.system.toUpperCase()} (${p.diameter}")`;
+          pipeSummary[key] = (pipeSummary[key] || 0) + meters;
+        }
+      });
+
+      nodes.forEach(n => {
+        if (n.fitting && n.fitting !== 'none') {
+          fittingSummary[n.fitting] = (fittingSummary[n.fitting] || 0) + 1;
+        }
+      });
+
+      let html = '<table><tr><th>Elemento</th><th>Cantidad / Longitud</th></tr>';
+      for (let item in pipeSummary) {
+        html += `<tr><td>${item}</td><td>${pipeSummary[item].toFixed(2)} m</td></tr>`;
+      }
+      for (let fit in fittingSummary) {
+        html += `<tr><td>Accesorio: ${fit.toUpperCase()}</td><td>${fittingSummary[fit]} pcs</td></tr>`;
+      }
+      html += '</table>';
+
+      document.getElementById('materials-list').innerHTML = html;
+      closeModal('menu-modal');
+      openModal('materials-modal');
+    }
+
+    function saveData() {
+      localStorage.setItem('iso_pro_nodes', JSON.stringify(nodes));
+      localStorage.setItem('iso_pro_pipes', JSON.stringify(pipes));
+      alert('¡Proyecto guardado en el teléfono!');
+      closeModal('menu-modal');
+    }
+
+    function loadData() {
+      const sn = localStorage.getItem('iso_pro_nodes');
+      const sp = localStorage.getItem('iso_pro_pipes');
+      if (sn) nodes = JSON.parse(sn);
+      if (sp) pipes = JSON.parse(sp);
+    }
+
+    function clearAll() {
+      if (confirm('¿Deseas reiniciar todo el dibujo?')) {
+        nodes = []; pipes = []; history = []; selectedNode = null;
+        localStorage.removeItem('iso_pro_nodes');
+        localStorage.removeItem('iso_pro_pipes');
+        draw();
+        closeModal('menu-modal');
+      }
     }
 
     function exportImage() {
@@ -247,10 +359,10 @@
       link.download = 'isograma_plomeria.png';
       link.href = canvas.toDataURL();
       link.click();
-      toggleMenu();
+      closeModal('menu-modal');
     }
 
-    // Inicialización
+    // Inicio
     loadData();
     resizeCanvas();
   </script>
