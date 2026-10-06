@@ -1,266 +1,106 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Visualizador Isométrico - App Web & Móvil</title>
-    <!-- Manifest dinámico para instalación PWA -->
-    <link rel="manifest" id="manifest-placeholder">
-    <meta name="theme-color" content="#1e1e24">
-    <!-- Carga segura de la librería SVG.js desde CDN para evitar colisiones de caracteres -->
-    <script src="https://cloudflare.com"></script>
-    <style>
-        * { box-sizing: border-box; touch-action: manipulation; }
-        body { 
-            margin: 0; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background: #141419; 
-            color: #e1e1e6; 
-            display: flex; 
-            height: 100vh; 
-            overflow: hidden; 
-        }
-
-        #sidebar { 
-            width: 340px; 
-            background: #1e1e24; 
-            padding: 16px; 
-            box-shadow: 4px 0 15px rgba(0,0,0,0.5); 
-            display: flex;
-            flex-direction: column;
-            z-index: 200;
-            transition: left 0.3s ease;
-            position: relative;
-        }
-
-        @media (max-width: 768px) {
-            #sidebar {
-                position: absolute;
-                top: 0;
-                left: -350px;
-                height: 100%;
-                width: 300px;
-            }
-            #sidebar.active {
-                left: 0;
-            }
-        }
-
-        #sidebar-header {
-            margin-bottom: 10px;
-            border-bottom: 1px solid #2d2d38;
-            padding-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        h3 { margin: 0; color: #4f83cc; font-size: 16px; }
-        .subtitle { font-size: 11px; color: #a4b0be; margin: 2px 0 0 0; }
-
-        .color-legend { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr;
-            gap: 6px; 
-            margin-bottom: 10px; 
-            font-size: 11px; 
-            background: #141419;
-            padding: 8px;
-            border-radius: 6px;
-            border: 1px solid #2d2d38;
-        }
-
-        .legend-tag { display: flex; align-items: center; gap: 6px; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-
-        #node-container { flex: 1; overflow-y: auto; padding-right: 4px; }
-
-        .node-item { 
-            background: #282832; 
-            padding: 8px; 
-            margin-bottom: 6px; 
-            border-radius: 6px; 
-            font-size: 11px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border: 1px solid #3d3d4d;
-        }
-
-        .node-info { display: flex; flex-direction: column; max-width: 150px; }
-        .node-title { font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .node-level { font-size: 9px; color: #8e8e93; }
-
-        .inputs { display: flex; gap: 4px; align-items: center; }
-        .inputs label { font-size: 10px; color: #a4b0be; }
-        .inputs input { 
-            width: 38px; 
-            background: #141419; 
-            border: 1px solid #3d3d4d; 
-            color: #00a8ff; 
-            font-weight: bold;
-            text-align: center; 
-            border-radius: 4px; 
-            font-size: 11px; 
-            padding: 3px 0; 
-        }
-
-        #canvas-container { 
-            flex: 1; 
-            position: relative; 
-            cursor: grab; 
-            background-color: #141419;
-            background-image: radial-gradient(#2d2d38 1px, transparent 1px); 
-            background-size: 24px 24px; 
-            touch-action: none;
-        }
-
-        .controls-overlay {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: #1e1e24;
-            border: 1px solid #2d2d38;
-            border-radius: 8px;
-            padding: 4px;
-            display: flex;
-            gap: 4px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            z-index: 5;
-        }
-
-        .btn-ctrl {
-            background: #282832;
-            color: #fff;
-            border: 1px solid #3d3d4d;
-            border-radius: 4px;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        .toolbar-controls {
-            position: absolute; 
-            top: 10px; 
-            left: 10px; 
-            right: 10px;
-            z-index: 100; 
-            display: flex; 
-            gap: 6px; 
-            background: rgba(30, 30, 36, 0.95); 
-            padding: 8px; 
-            border-radius: 8px;
-            border: 1px solid #2d2d38;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            overflow-x: auto;
-            white-space: nowrap;
-        }
-
-        .toolbar-controls button, .toolbar-controls select {
-            background: #282832;
-            color: white;
-            border: 1px solid #3d3d4d;
-            padding: 6px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 11px;
-            font-weight: 500;
-            flex-shrink: 0;
-        }
-
-        .toolbar-controls button.active {
-            background: #4f83cc;
-            border-color: #4f83cc;
-        }
-
-        .btn-close-sidebar {
-            display: none;
-            background: #ff4757;
-            border: none;
-            color: #fff;
-            font-size: 11px;
-            font-weight: bold;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        @media (max-width: 768px) {
-            .btn-close-sidebar { display: block; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Isogramas de Plomería</title>
+  <style>
+    * { box-sizing: border-box; touch-action: none; margin: 0; padding: 0; user-select: none; }
+    body { background: #141419; color: #e1e1e6; font-family: system-ui, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    #toolbar { display: flex; gap: 8px; padding: 10px; background: #1e1e24; border-bottom: 1px solid #323238; overflow-x: auto; }
+    button { background: #29292e; color: #fff; border: 1px solid #323238; padding: 8px 14px; border-radius: 6px; font-size: 14px; white-space: nowrap; }
+    button.active { background: #00875f; border-color: #00b37e; font-weight: bold; }
+    #canvas-container { flex: 1; position: relative; width: 100%; height: 100%; background: #09090a; }
+    svg { width: 100%; height: 100%; display: block; }
+  </style>
 </head>
 <body>
+  <div id="toolbar">
+    <button id="btn-move" class="active" onclick="setMode('move')">✋ Mover</button>
+    <button id="btn-node" onclick="setMode('node')">📍 Nodo</button>
+    <button id="btn-pipe" onclick="setMode('pipe')">🔗 Tubo</button>
+    <button id="btn-clear" onclick="clearCanvas()">🗑️ Limpiar</button>
+  </div>
+  <div id="canvas-container">
+    <svg id="svg-canvas">
+      <defs>
+        <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+          <circle cx="15" cy="15" r="1.5" fill="#323238" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)" />
+      <g id="lines-group"></g>
+      <g id="nodes-group"></g>
+    </svg>
+  </div>
+  <script>
+    let mode = 'move';
+    let nodes = [];
+    let selectedNode = null;
+    const svg = document.getElementById('svg-canvas');
+    const nodesGroup = document.getElementById('nodes-group');
+    const linesGroup = document.getElementById('lines-group');
 
-    <!-- Input Oculto para Cargar Archivo JSON -->
-    <input type="file" id="file-input-json" accept=".json" style="display: none;" onchange="importarJSON(event)">
+    function setMode(newMode) {
+      mode = newMode;
+      document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + newMode).classList.add('active');
+      selectedNode = null;
+    }
 
-    <!-- Barra de Herramientas -->
-    <div class="toolbar-controls">
-        <button id="btn-toggle-sidebar" onclick="toggleSidebar()">📋 Menú</button>
-        <button id="btn-mode-pan" class="active" onclick="setMode('pan')">✋ Mover</button>
-        <button id="btn-mode-node" onclick="setMode('add_node')">📍 Nodo</button>
-        <button id="btn-mode-pipe" onclick="setMode('add_pipe')">🔗 Tubo</button>
-        
-        <select id="select-nivel" onchange="activeLevel=this.value">
-            <option value="subterraneo">Subterráneo (-2.00m)</option>
-            <option value="pb" selected>Planta Baja (0.00m)</option>
-            <option value="nivel_1">Nivel 1 (+3.00m)</option>
-            <option value="terraza">Terraza (+6.00m)</option>
-            <option value="parapeto">Parapeto (+7.50m)</option>
-        </select>
+    function clearCanvas() {
+      nodes = [];
+      nodesGroup.innerHTML = '';
+      linesGroup.innerHTML = '';
+      selectedNode = null;
+    }
 
-        <button onclick="document.getElementById('file-input-json').click()" style="background: #2ed573; border-color: #2ed573; color: white;">📂 Cargar JSON</button>
-        <button onclick="exportarJSON()" style="background: #ffa502; border-color: #ffa502; color: white;">💾 Guardar JSON</button>
-        <button onclick="exportarSVG()" style="background: #00a8ff; border-color: #00a8ff; color: white;">🖼️ SVG</button>
-        <button onclick="exportarDXF()" style="background: #5758bb; border-color: #5758bb; color: white;">📐 DXF</button>
-    </div>
+    svg.addEventListener('pointerdown', (e) => {
+      const rect = svg.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) / 30) * 30;
+      const y = Math.round((e.clientY - rect.top) / 30) * 30;
 
-    <!-- Barra Lateral (Menú de Nodos) -->
-    <div id="sidebar">
-        <div id="sidebar-header">
-            <div>
-                <h3>Editor Isométrico</h3>
-                <p class="subtitle">Gestión Web y Móvil PWA</p>
-            </div>
-            <button class="btn-close-sidebar" onclick="toggleSidebar()">Cerrar</button>
-        </div>
+      if (mode === 'node') {
+        const node = { x, y, id: Date.now() };
+        nodes.push(node);
+        renderNodes();
+      } else if (mode === 'pipe') {
+        const clicked = nodes.find(n => Math.hypot(n.x - x, n.y - y) < 25);
+        if (clicked) {
+          if (!selectedNode) {
+            selectedNode = clicked;
+            renderNodes();
+          } else if (selectedNode.id !== clicked.id) {
+            drawPipe(selectedNode, clicked);
+            selectedNode = null;
+            renderNodes();
+          }
+        }
+      }
+    });
 
-        <div class="color-legend">
-            <div class="legend-tag"><span class="dot" style="background:#00a8ff"></span> Fría</div>
-            <div class="legend-tag"><span class="dot" style="background:#ff4757"></span> Caliente</div>
-            <div class="legend-tag"><span class="dot" style="background:#ffa502"></span> Gas</div>
-            <div class="legend-tag"><span class="dot" style="background:#a4b0be"></span> Cloaca</div>
-        </div>
+    function renderNodes() {
+      nodesGroup.innerHTML = '';
+      nodes.forEach(n => {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', n.x);
+        circle.setAttribute('cy', n.y);
+        circle.setAttribute('r', '8');
+        circle.setAttribute('fill', selectedNode && selectedNode.id === n.id ? '#00b37e' : '#fba94c');
+        nodesGroup.appendChild(circle);
+      });
+    }
 
-        <div style="font-size: 11px; margin-bottom: 8px; color: #4f83cc; font-weight: bold;">NODOS REGISTRADOS:</div>
-        <div id="node-container"></div>
-    </div>
-
-    <!-- Contenedor del Canvas Técnico -->
-    <div id="canvas-container">
-        <div class="controls-overlay">
-            <button class="btn-ctrl" id="btn-zoom-in" title="Acercar">+</button>
-            <button class="btn-ctrl" id="btn-zoom-out" title="Alejar">-</button>
-            <button class="btn-ctrl" id="btn-reset" title="Restablecer Vista">⟲</button>
-        </div>
-    </div>
-
-    <script>
-        // Estructura de Datos Base del Proyecto
-        let data = {
-            niveles: { subterraneo: -2.0, pb: 0.0, nivel_1: 3.0, terraza: 6.0, parapeto: 7.5 },
-            nodos: [
-                { id: "tanque_subterraneo", tipo: "Tanque", nivel: "subterraneo", x: 15, y: 5 },
-                { id: "bomba_esybox", tipo: "Bomba", nivel: "pb", x: 25, y: 20 },
-                { id: "caseta_gas", tipo: "Caseta Gas", nivel: "pb", x: 50, y: 20 },
-                { id: "red_principal_cloacal", tipo: "Punto Terminal", nivel: "pb", x: 80, y: 20 },
-                { id: "batea_freg_pb", tipo: "Batea / Fregadero", nivel: "pb", x: 25, y: 30 },
-                { id: "gas_cocina", tipo: "Punto Gas", nivel: "pb", x: 25, y: 28 },
-                { id: "wc_pb", tipo: "WC", nivel: "pb", x: 25, y: 35 },
-                { id: "lavamanos_pb", tipo: "Lavamanos", nivel: "pb", x: 25, y: 33 },
-                { id: "calentador", tipo: "Calentador", nivel: "nivel_1", x: 15, y: 50 },
+    function drawPipe(n1, n2) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', n1.x);
+      line.setAttribute('y1', n1.y);
+      line.setAttribute('x2', n2.x);
+      line.setAttribute('y2', n2.y);
+      line.setAttribute('stroke', '#00b37e');
+      line.setAttribute('stroke-width', '4');
+      linesGroup.appendChild(line);
+    }
+  </script>
+</body>
+</html>
