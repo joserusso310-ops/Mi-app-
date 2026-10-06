@@ -3,104 +3,256 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Isogramas de Plomería</title>
+  <title>Editor de Isogramas de Plomería</title>
   <style>
-    * { box-sizing: border-box; touch-action: none; margin: 0; padding: 0; user-select: none; }
-    body { background: #141419; color: #e1e1e6; font-family: system-ui, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-    #toolbar { display: flex; gap: 8px; padding: 10px; background: #1e1e24; border-bottom: 1px solid #323238; overflow-x: auto; }
-    button { background: #29292e; color: #fff; border: 1px solid #323238; padding: 8px 14px; border-radius: 6px; font-size: 14px; white-space: nowrap; }
-    button.active { background: #00875f; border-color: #00b37e; font-weight: bold; }
-    #canvas-container { flex: 1; position: relative; width: 100%; height: 100%; background: #09090a; }
-    svg { width: 100%; height: 100%; display: block; }
+    * { box-sizing: border-box; touch-action: none; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    body { background: #141419; color: #e1e1e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    
+    /* Barra Superior */
+    #toolbar { display: flex; gap: 6px; padding: 8px; background: #1e1e24; border-bottom: 1px solid #323238; overflow-x: auto; align-items: center; z-index: 10; }
+    button { background: #29292e; color: #e1e1e6; border: 1px solid #323238; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+    button:active { background: #323238; }
+    button.active { background: #2d82b7; border-color: #00b37e; color: #fff; font-weight: bold; }
+    
+    /* Contenedor del Lienzo */
+    #canvas-container { flex: 1; position: relative; width: 100%; height: 100%; background: #09090a; cursor: crosshair; }
+    canvas { width: 100%; height: 100%; display: block; }
+    
+    /* Menú Modal */
+    #menu-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
+    .modal-content { background: #1e1e24; border: 1px solid #323238; border-radius: 12px; padding: 20px; width: 85%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+    .modal-content h3 { color: #fff; text-align: center; font-size: 18px; margin-bottom: 5px; }
+    .modal-btn { padding: 12px; border-radius: 8px; background: #29292e; border: 1px solid #323238; color: #fff; text-align: center; font-size: 14px; font-weight: 600; }
+    .modal-btn.primary { background: #00875f; border-color: #00b37e; }
+    .modal-btn.danger { background: #aa2424; border-color: #f75a68; }
   </style>
 </head>
 <body>
+
   <div id="toolbar">
+    <button id="btn-menu" onclick="toggleMenu()">📋 Menú</button>
     <button id="btn-move" class="active" onclick="setMode('move')">✋ Mover</button>
     <button id="btn-node" onclick="setMode('node')">📍 Nodo</button>
     <button id="btn-pipe" onclick="setMode('pipe')">🔗 Tubo</button>
-    <button id="btn-clear" onclick="clearCanvas()">🗑️ Limpiar</button>
+    <button id="btn-level" onclick="toggleLevel()">🏢 Planta Baja</button>
   </div>
+
   <div id="canvas-container">
-    <svg id="svg-canvas">
-      <defs>
-        <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
-          <circle cx="15" cy="15" r="1.5" fill="#323238" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#grid)" />
-      <g id="lines-group"></g>
-      <g id="nodes-group"></g>
-    </svg>
+    <canvas id="isoCanvas"></canvas>
   </div>
+
+  <!-- Modal Menú -->
+  <div id="menu-modal" onclick="toggleMenu()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <h3>Opciones del Proyecto</h3>
+      <button class="modal-btn primary" onclick="exportImage()">📸 Exportar Imagen (PNG)</button>
+      <button class="modal-btn" onclick="saveData()">💾 Guardar en Teléfono</button>
+      <button class="modal-btn danger" onclick="clearAll()">🗑️ Borrar Todo</button>
+      <button class="modal-btn" onclick="toggleMenu()">❌ Cerrar</button>
+    </div>
+  </div>
+
   <script>
-    let mode = 'move';
+    const canvas = document.getElementById('isoCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Estado de la app
+    let mode = 'move'; // move, node, pipe
+    let currentLevel = 'Planta Baja';
+    let panX = 0, panY = 0;
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    
     let nodes = [];
+    let pipes = [];
     let selectedNode = null;
-    const svg = document.getElementById('svg-canvas');
-    const nodesGroup = document.getElementById('nodes-group');
-    const linesGroup = document.getElementById('lines-group');
+    
+    const isoAngle = Math.PI / 6; // 30 grados
+    const gridSize = 40;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      draw();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // Guardado y Carga
+    function saveData() {
+      localStorage.setItem('iso_plumbing_nodes', JSON.stringify(nodes));
+      localStorage.setItem('iso_plumbing_pipes', JSON.stringify(pipes));
+      alert('¡Proyecto guardado con éxito!');
+      toggleMenu();
+    }
+
+    function loadData() {
+      const savedNodes = localStorage.getItem('iso_plumbing_nodes');
+      const savedPipes = localStorage.getItem('iso_plumbing_pipes');
+      if(savedNodes) nodes = JSON.parse(savedNodes);
+      if(savedPipes) pipes = JSON.parse(savedPipes);
+    }
+
+    function clearAll() {
+      if(confirm('¿Seguro que deseas borrar todo el dibujo?')) {
+        nodes = [];
+        pipes = [];
+        selectedNode = null;
+        localStorage.removeItem('iso_plumbing_nodes');
+        localStorage.removeItem('iso_plumbing_pipes');
+        draw();
+        toggleMenu();
+      }
+    }
+
+    function toggleMenu() {
+      const modal = document.getElementById('menu-modal');
+      modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+    }
 
     function setMode(newMode) {
       mode = newMode;
-      document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#toolbar button').forEach(b => {
+        if(b.id.startsWith('btn-') && b.id !== 'btn-menu' && b.id !== 'btn-level') {
+          b.classList.remove('active');
+        }
+      });
       document.getElementById('btn-' + newMode).classList.add('active');
       selectedNode = null;
+      draw();
     }
 
-    function clearCanvas() {
-      nodes = [];
-      nodesGroup.innerHTML = '';
-      linesGroup.innerHTML = '';
-      selectedNode = null;
+    function toggleLevel() {
+      currentLevel = currentLevel === 'Planta Baja' ? 'Planta Alta' : 'Planta Baja';
+      document.getElementById('btn-level').innerText = '🏢 ' + currentLevel;
+      draw();
     }
 
-    svg.addEventListener('pointerdown', (e) => {
-      const rect = svg.getBoundingClientRect();
-      const x = Math.round((e.clientX - rect.left) / 30) * 30;
-      const y = Math.round((e.clientY - rect.top) / 30) * 30;
+    // Conversión de coordenadas a Isométrico con Ajuste (Snap)
+    function getIsoGridPoint(screenX, screenY) {
+      const relX = screenX - (canvas.width / 2) - panX;
+      const relY = screenY - (canvas.height / 3) - panY;
 
-      if (mode === 'node') {
-        const node = { x, y, id: Date.now() };
-        nodes.push(node);
-        renderNodes();
+      // Inversa isométrica
+      const isoX = (relX / Math.cos(isoAngle) + relY / Math.sin(isoAngle)) / 2;
+      const isoY = (relY / Math.sin(isoAngle) - relX / Math.cos(isoAngle)) / 2;
+
+      // Snap a la cuadrícula
+      const snappedIsoX = Math.round(isoX / gridSize) * gridSize;
+      const snappedIsoY = Math.round(isoY / gridSize) * gridSize;
+
+      // Proyectar de vuelta a pantalla
+      const finalX = (canvas.width / 2) + panX + (snappedIsoX - snappedIsoY) * Math.cos(isoAngle);
+      const finalY = (canvas.height / 3) + panY + (snappedIsoX + snappedIsoY) * Math.sin(isoAngle);
+
+      return { x: finalX, y: finalY, level: currentLevel };
+    }
+
+    // Eventos Táctiles y Ratón (PointerEvents)
+    canvas.addEventListener('pointerdown', (e) => {
+      startX = e.clientX;
+      startY = e.clientY;
+
+      if (mode === 'move') {
+        isDragging = true;
+      } else if (mode === 'node') {
+        const point = getIsoGridPoint(e.clientX, e.clientY);
+        nodes.push({ id: Date.now(), x: point.x - panX, y: point.y - panY, level: currentLevel });
+        draw();
       } else if (mode === 'pipe') {
-        const clicked = nodes.find(n => Math.hypot(n.x - x, n.y - y) < 25);
+        const point = { x: e.clientX - panX, y: e.clientY - panY };
+        const clicked = nodes.find(n => Math.hypot(n.x - point.x, n.y - point.y) < 25 && n.level === currentLevel);
+        
         if (clicked) {
           if (!selectedNode) {
             selectedNode = clicked;
-            renderNodes();
           } else if (selectedNode.id !== clicked.id) {
-            drawPipe(selectedNode, clicked);
+            pipes.push({ id: Date.now(), from: selectedNode.id, to: clicked.id, level: currentLevel });
             selectedNode = null;
-            renderNodes();
           }
+          draw();
         }
       }
     });
 
-    function renderNodes() {
-      nodesGroup.innerHTML = '';
+    canvas.addEventListener('pointermove', (e) => {
+      if (isDragging && mode === 'move') {
+        panX += e.clientX - startX;
+        panY += e.clientY - startY;
+        startX = e.clientX;
+        startY = e.clientY;
+        draw();
+      }
+    });
+
+    canvas.addEventListener('pointerup', () => { isDragging = false; });
+    canvas.addEventListener('pointercancel', () => { isDragging = false; });
+
+    // Renderizado del Isograma
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Dibujar Rejilla Isométrica
+      ctx.strokeStyle = '#23232a';
+      ctx.lineWidth = 1;
+      const centerX = canvas.width / 2 + panX;
+      const centerY = canvas.height / 3 + panY;
+
+      for (let r = -15; r <= 15; r++) {
+        for (let c = -15; c <= 15; c++) {
+          const gx = centerX + (r - c) * gridSize * Math.cos(isoAngle);
+          const gy = centerY + (r + c) * gridSize * Math.sin(isoAngle);
+          ctx.beginPath();
+          ctx.arc(gx, gy, 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#323238';
+          ctx.fill();
+        }
+      }
+
+      // Dibujar Tuberías
+      pipes.forEach(p => {
+        const n1 = nodes.find(n => n.id === p.from);
+        const n2 = nodes.find(n => n.id === p.to);
+        if (n1 && n2) {
+          ctx.beginPath();
+          ctx.moveTo(n1.x + panX, n1.y + panY);
+          ctx.lineTo(n2.x + panX, n2.y + panY);
+          ctx.strokeStyle = p.level === 'Planta Baja' ? '#00b37e' : '#2d82b7';
+          ctx.lineWidth = 5;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        }
+      });
+
+      // Dibujar Nodos / Accesorios
       nodes.forEach(n => {
-        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        circle.setAttribute('cx', n.x);
-        circle.setAttribute('cy', n.y);
-        circle.setAttribute('r', '8');
-        circle.setAttribute('fill', selectedNode && selectedNode.id === n.id ? '#00b37e' : '#fba94c');
-        nodesGroup.appendChild(circle);
+        const isCurrentLevel = n.level === currentLevel;
+        ctx.beginPath();
+        ctx.arc(n.x + panX, n.y + panY, 7, 0, Math.PI * 2);
+        
+        if (selectedNode && selectedNode.id === n.id) {
+          ctx.fillStyle = '#fba94c'; // Nodo seleccionado
+        } else {
+          ctx.fillStyle = isCurrentLevel ? (n.level === 'Planta Baja' ? '#00b37e' : '#2d82b7') : '#44444e';
+        }
+        
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       });
     }
 
-    function drawPipe(n1, n2) {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', n1.x);
-      line.setAttribute('y1', n1.y);
-      line.setAttribute('x2', n2.x);
-      line.setAttribute('y2', n2.y);
-      line.setAttribute('stroke', '#00b37e');
-      line.setAttribute('stroke-width', '4');
-      linesGroup.appendChild(line);
+    function exportImage() {
+      const link = document.createElement('a');
+      link.download = 'isograma_plomeria.png';
+      link.href = canvas.toDataURL();
+      link.click();
+      toggleMenu();
     }
+
+    // Inicialización
+    loadData();
+    resizeCanvas();
   </script>
 </body>
 </html>
