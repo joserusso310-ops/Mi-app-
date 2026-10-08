@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Diseñador de Isogramas de Plomería</title>
+  <title>Diseñador Isométrico & Analizador con IA de Plomería</title>
   <style>
     * { box-sizing: border-box; touch-action: none; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
     body { background: #121214; color: #e1e1e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
@@ -12,27 +12,35 @@
     #toolbar { display: flex; gap: 6px; padding: 8px; background: #1e1e24; border-bottom: 1px solid #323238; overflow-x: auto; align-items: center; z-index: 10; scrollbar-width: none; }
     #toolbar::-webkit-scrollbar { display: none; }
     
-    button, select { background: #29292e; color: #e1e1e6; border: 1px solid #323238; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; display: flex; align-items: center; gap: 5px; outline: none; }
-    button:active, select:active { background: #323238; }
+    button, select, label.btn-label { background: #29292e; color: #e1e1e6; border: 1px solid #323238; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; display: flex; align-items: center; gap: 5px; outline: none; cursor: pointer; }
+    button:active, select:active, label.btn-label:active { background: #323238; }
     button.active { background: #00875f; border-color: #00b37e; color: #fff; }
-    select { padding-right: 20px; }
+    button.ai-btn { background: #8257e5; border-color: #996dff; color: #fff; }
 
     /* Contenedor del Lienzo */
     #canvas-container { flex: 1; position: relative; width: 100%; height: 100%; background: #09090a; }
     canvas { width: 100%; height: 100%; display: block; }
 
-    /* Menús Modales */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; justify-content: center; align-items: center; }
-    .modal-content { background: #1e1e24; border: 1px solid #323238; border-radius: 12px; padding: 20px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 12px; max-height: 85vh; overflow-y: auto; }
-    .modal-content h3 { color: #fff; text-align: center; font-size: 18px; margin-bottom: 5px; }
+    /* Modales */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; }
+    .modal-content { background: #1e1e24; border: 1px solid #323238; border-radius: 12px; padding: 20px; width: 90%; max-width: 450px; display: flex; flex-direction: column; gap: 12px; max-height: 85vh; overflow-y: auto; }
+    .modal-content h3 { color: #fff; text-align: center; font-size: 18px; }
     .modal-btn { padding: 12px; border-radius: 8px; background: #29292e; border: 1px solid #323238; color: #fff; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer; }
     .modal-btn.primary { background: #00875f; border-color: #00b37e; }
+    .modal-btn.purple { background: #8257e5; border-color: #996dff; }
     .modal-btn.danger { background: #aa2424; border-color: #f75a68; }
+
+    /* Estilos de Controles de Capa de Fondo */
+    .bg-controls { display: flex; align-items: center; gap: 8px; background: #121214; padding: 8px; border-radius: 6px; font-size: 12px; }
+    .bg-controls input[type=range] { flex: 1; }
 
     /* Tabla de Materiales */
     table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
     th, td { border: 1px solid #323238; padding: 8px; text-align: left; }
     th { background: #29292e; color: #00b37e; }
+
+    /* AI Analysis Result Text Format */
+    .ai-result-box { background: #121214; border: 1px solid #323238; padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; color: #e1e1e6; white-space: pre-wrap; word-break: break-word; }
   </style>
 </head>
 <body>
@@ -40,6 +48,15 @@
   <!-- Barra de Herramientas Principal -->
   <div id="toolbar">
     <button onclick="openModal('menu-modal')">📋 Menú</button>
+    
+    <!-- Carga de Imagen de Fondo para Calcado -->
+    <label class="btn-label" for="bg-upload">🖼️ Cargar Plano
+      <input type="file" id="bg-upload" accept="image/*" style="display:none" onchange="loadBackgroundImage(event)">
+    </label>
+
+    <!-- Botón IA -->
+    <button class="ai-btn" onclick="analyzeImageWithAI()">🤖 Analizar con IA</button>
+
     <button id="btn-move" class="active" onclick="setMode('move')">✋ Mover</button>
     <button id="btn-node" onclick="setMode('node')">📍 Nodo</button>
     <button id="btn-pipe" onclick="setMode('pipe')">🔗 Tubo</button>
@@ -52,7 +69,7 @@
       <option value="gas">🟡 Ventilación / Gas</option>
     </select>
 
-    <!-- Diámetro -->
+    <!-- Diámetros -->
     <select id="pipe-dia">
       <option value="1/2">½"</option>
       <option value="3/4">¾"</option>
@@ -84,7 +101,15 @@
   <div id="menu-modal" class="modal" onclick="closeModal('menu-modal')">
     <div class="modal-content" onclick="event.stopPropagation()">
       <h3>Opciones del Proyecto</h3>
+
+      <div class="bg-controls" id="bg-tools" style="display:none;">
+        <span>Transparencia Plano:</span>
+        <input type="range" id="bg-opacity" min="0.1" max="1" step="0.1" value="0.5" oninput="draw()">
+        <button onclick="clearBgImage()" style="padding:4px 8px; font-size:11px;">Quitar Plano</button>
+      </div>
+
       <button class="modal-btn primary" onclick="generateMaterials()">📊 Cómputo de Materiales</button>
+      <button class="modal-btn purple" onclick="configureApiKey()">🔑 Configurar Clave API Gemini</button>
       <button class="modal-btn" onclick="exportImage()">📸 Exportar Imagen (PNG)</button>
       <button class="modal-btn" onclick="saveData()">💾 Guardar Proyecto</button>
       <button class="modal-btn danger" onclick="clearAll()">🗑️ Borrar Todo</button>
@@ -95,9 +120,22 @@
   <!-- Modal Cómputo de Materiales -->
   <div id="materials-modal" class="modal" onclick="closeModal('materials-modal')">
     <div class="modal-content" onclick="event.stopPropagation()">
-      <h3>Lista de Materiales</h3>
+      <h3>Lista de Materiales Trazados</h3>
       <div id="materials-list"></div>
       <button class="modal-btn" onclick="closeModal('materials-modal')">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Modal Resultados IA -->
+  <div id="ai-modal" class="modal" onclick="closeModal('ai-modal')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <h3>🤖 Análisis e Isograma IA</h3>
+      <div id="ai-loading" style="display:none; text-align:center; padding:20px;">
+        <p>🔍 Analizando plano/boceto con visión artificial...</p>
+        <p style="font-size:12px; color:#888; margin-top:8px;">Detectando tuberías, puntos de agua, metros lineales y accesorios.</p>
+      </div>
+      <div id="ai-results" class="ai-result-box" style="display:none;"></div>
+      <button class="modal-btn" onclick="closeModal('ai-modal')">Cerrar</button>
     </div>
   </div>
 
@@ -105,7 +143,7 @@
     const canvas = document.getElementById('isoCanvas');
     const ctx = canvas.getContext('2d');
 
-    // Configuración del Sistema
+    // Estado de la Aplicación
     let mode = 'move';
     let currentLevel = 'Planta Baja';
     let panX = 0, panY = 0;
@@ -116,6 +154,11 @@
     let pipes = [];
     let history = [];
     let selectedNode = null;
+
+    // Fondo / Plano
+    let bgImage = null;
+    let bgBase64 = null;
+    let bgMimeType = 'image/jpeg';
 
     const isoAngle = Math.PI / 6; // 30 grados
     const gridSize = 35;
@@ -168,7 +211,34 @@
       draw();
     }
 
-    // Conversión e Intersección Isométrica
+    // Cargar Plano de Fondo para Calcado
+    function loadBackgroundImage(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      bgMimeType = file.type || 'image/jpeg';
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        bgBase64 = event.target.result;
+        const img = new Image();
+        img.onload = function() {
+          bgImage = img;
+          document.getElementById('bg-tools').style.display = 'flex';
+          draw();
+        };
+        img.src = bgBase64;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearBgImage() {
+      bgImage = null;
+      bgBase64 = null;
+      document.getElementById('bg-tools').style.display = 'none';
+      draw();
+    }
+
+    // Grid e Isometría
     function getIsoGridPoint(screenX, screenY) {
       const relX = screenX - (canvas.width / 2) - panX;
       const relY = screenY - (canvas.height / 3) - panY;
@@ -185,7 +255,7 @@
       return { x: finalX, y: finalY };
     }
 
-    // Eventos Táctiles y de Ratón
+    // Eventos Táctiles
     canvas.addEventListener('pointerdown', (e) => {
       startX = e.clientX;
       startY = e.clientY;
@@ -229,11 +299,28 @@
 
     canvas.addEventListener('pointerup', () => isDragging = false);
 
-    // Dibujado Principal
+    // Renderizado en Pantalla
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Rejilla Isométrica
+      // 1. Dibujar Plano de Fondo (Calcado)
+      if (bgImage) {
+        ctx.save();
+        const opacity = parseFloat(document.getElementById('bg-opacity').value) || 0.5;
+        ctx.globalAlpha = opacity;
+        
+        // Escalar manteniendo proporción
+        const scale = Math.min(canvas.width / bgImage.width, canvas.height / bgImage.height) * 0.9;
+        const imgW = bgImage.width * scale;
+        const imgH = bgImage.height * scale;
+        const imgX = (canvas.width - imgW) / 2 + panX;
+        const imgY = (canvas.height - imgH) / 2 + panY;
+
+        ctx.drawImage(bgImage, imgX, imgY, imgW, imgH);
+        ctx.restore();
+      }
+
+      // 2. Dibujar Rejilla Isométrica
       const centerX = canvas.width / 2 + panX;
       const centerY = canvas.height / 3 + panY;
 
@@ -243,12 +330,12 @@
           const gy = centerY + (r + c) * gridSize * Math.sin(isoAngle);
           ctx.beginPath();
           ctx.arc(gx, gy, 1.2, 0, Math.PI * 2);
-          ctx.fillStyle = '#323238';
+          ctx.fillStyle = bgImage ? '#00b37e' : '#323238';
           ctx.fill();
         }
       }
 
-      // Dibujar Tuberías
+      // 3. Dibujar Tuberías
       pipes.forEach(p => {
         const n1 = nodes.find(n => n.id === p.from);
         const n2 = nodes.find(n => n.id === p.to);
@@ -259,13 +346,13 @@
           ctx.strokeStyle = sysColors[p.system] || '#00a8ff';
           ctx.lineWidth = Math.max(3, parseFloat(p.diameter) * 3);
           ctx.lineCap = 'round';
-          if (p.level !== currentLevel) ctx.globalAlpha = 0.3;
+          if (p.level !== currentLevel) ctx.globalAlpha = 0.25;
           ctx.stroke();
           ctx.globalAlpha = 1.0;
         }
       });
 
-      // Dibujar Nodos y Accesorios
+      // 4. Dibujar Nodos y Accesorios
       nodes.forEach(n => {
         const isCurrent = n.level === currentLevel;
         const nx = n.x + panX;
@@ -279,7 +366,6 @@
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Iconos de Accesorios
         if (n.fitting && n.fitting !== 'none') {
           ctx.fillStyle = '#fff';
           ctx.font = '10px sans-serif';
@@ -304,7 +390,7 @@
         const n2 = nodes.find(n => n.id === p.to);
         if (n1 && n2) {
           const distPixels = Math.hypot(n2.x - n1.x, n2.y - n1.y);
-          const meters = (distPixels / gridSize) * 0.5; // Escala: 1 cuadrícula = 0.5m
+          const meters = (distPixels / gridSize) * 0.5; // 1 cuadrícula = 0.5m
           const key = `Tubería ${p.system.toUpperCase()} (${p.diameter}")`;
           pipeSummary[key] = (pipeSummary[key] || 0) + meters;
         }
@@ -316,7 +402,7 @@
         }
       });
 
-      let html = '<table><tr><th>Elemento</th><th>Cantidad / Longitud</th></tr>';
+      let html = '<table><tr><th>Elemento</th><th>Cantidad / Metros</th></tr>';
       for (let item in pipeSummary) {
         html += `<tr><td>${item}</td><td>${pipeSummary[item].toFixed(2)} m</td></tr>`;
       }
@@ -330,10 +416,80 @@
       openModal('materials-modal');
     }
 
+    // Configuración de API Key de Google Gemini
+    function configureApiKey() {
+      const currentKey = localStorage.getItem('gemini_api_key') || '';
+      const key = prompt('Ingresa tu API Key de Google Gemini:', currentKey);
+      if (key !== null) {
+        localStorage.setItem('gemini_api_key', key.trim());
+        alert('¡API Key guardada correctamente!');
+      }
+    }
+
+    // Análisis de Croquis / Plano con Inteligencia Artificial
+    async function analyzeImageWithAI() {
+      if (!bgBase64) {
+        alert('Por favor, toca primero "🖼️ Cargar Plano" y selecciona una foto de tu dibujo o plano.');
+        return;
+      }
+
+      let apiKey = localStorage.getItem('gemini_api_key');
+      if (!apiKey) {
+        apiKey = prompt('Para usar el análisis con IA, ingresa tu API Key gratuita de Gemini (o configúrala en el Menú):');
+        if (!apiKey) return;
+        localStorage.setItem('gemini_api_key', apiKey.trim());
+      }
+
+      openModal('ai-modal');
+      document.getElementById('ai-loading').style.display = 'block';
+      document.getElementById('ai-results').style.display = 'none';
+
+      try {
+        const rawBase64 = bgBase64.split(',')[1];
+        const promptText = `
+          Actúa como un Ingeniero Hidráulico y Plomero Especialista. Analiza minuciosamente esta foto/plano/boceto a mano.
+          Entrega un reporte estructurado que incluya:
+          1. **Puntos de Agua y Drenaje Identificados:** Lista detallada (Lavamanos, W.C., Duchas, Bombas, Tanques, etc.).
+          2. **Cómputo Métrico Estimado:** Metros lineales aproximados de tubería requeridos por sistema (Agua Fría, Agua Caliente, Servidas/Drenaje) y sus diámetros recomendados (½", ¾", 2", 4").
+          3. **Cantidad Estimada de Accesorios:** Codos 90°, Tees, Válvulas de corte y uniones.
+          4. **Sugerencias y Recomendaciones Técnicas:** Pendientes para drenajes, presiones recomendadas, o correcciones al trazado del croquis.
+        `;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inline_data: { mime_type: bgMimeType, data: rawBase64 } }
+              ]
+            }]
+          })
+        });
+
+        const data = await response.json();
+        document.getElementById('ai-loading').style.display = 'none';
+
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+          const resText = data.candidates[0].content.parts[0].text;
+          document.getElementById('ai-results').innerText = resText;
+          document.getElementById('ai-results').style.display = 'block';
+        } else {
+          document.getElementById('ai-results').innerText = 'No se pudo obtener respuesta de la IA. Revisa si tu API Key es correcta.';
+          document.getElementById('ai-results').style.display = 'block';
+        }
+      } catch (err) {
+        document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('ai-results').innerText = 'Error al conectar con la IA: ' + err.message;
+        document.getElementById('ai-results').style.display = 'block';
+      }
+    }
+
     function saveData() {
       localStorage.setItem('iso_pro_nodes', JSON.stringify(nodes));
       localStorage.setItem('iso_pro_pipes', JSON.stringify(pipes));
-      alert('¡Proyecto guardado en el teléfono!');
+      alert('¡Proyecto guardado!');
       closeModal('menu-modal');
     }
 
@@ -345,8 +501,9 @@
     }
 
     function clearAll() {
-      if (confirm('¿Deseas reiniciar todo el dibujo?')) {
+      if (confirm('¿Deseas borrar todo el trazado actual?')) {
         nodes = []; pipes = []; history = []; selectedNode = null;
+        clearBgImage();
         localStorage.removeItem('iso_pro_nodes');
         localStorage.removeItem('iso_pro_pipes');
         draw();
@@ -356,7 +513,7 @@
 
     function exportImage() {
       const link = document.createElement('a');
-      link.download = 'isograma_plomeria.png';
+      link.download = 'isograma_completo.png';
       link.href = canvas.toDataURL();
       link.click();
       closeModal('menu-modal');
